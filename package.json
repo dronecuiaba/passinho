@@ -1,6 +1,6 @@
 {
   "name": "passinho-familia",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,12 @@
     "test:rules": "firebase emulators:exec --only firestore --project demo-passinho \"node --test tests/rules/*.test.js\"",
     "android:assets": "node scripts/android-assets.mjs"
   },
-  "dependencies": { "firebase": "13.1.0" },
-  "devDependencies": { "vite": "^7.0.0", "firebase-tools": "15.34.2", "@firebase/rules-unit-testing": "6.0.0" }
+  "dependencies": {
+    "firebase": "13.1.0"
+  },
+  "devDependencies": {
+    "vite": "^7.0.0",
+    "firebase-tools": "15.34.2",
+    "@firebase/rules-unit-testing": "6.0.0"
+  }
 }
