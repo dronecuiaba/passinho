@@ -193,7 +193,7 @@ async function lock(showToast=false) {
   await call('logout');if(showToast)toast('Área dos responsáveis bloqueada.');
 }
 window.lockFromNative=()=>{token='';view='home';date=state?.today||'';month=date.slice(0,7);$('#modal').close();cloud.lock().then(()=>call('get')).catch(e=>toast(e.message));};
-window.handleBack=()=>{if($('#modal').open){$('#modal').close();return false;}if(state.authenticated){lock();return false;}if(view!=='home'){view='home';render();return false;}return true;};
+window.handleBack=()=>{if(!state)return true;if($('#modal').open){$('#modal').close();return false;}if(state.authenticated){lock();return false;}if(view!=='home'){view='home';render();return false;}return true;};
 document.addEventListener('click',async event=>{
   const b=event.target.closest('[data-action]');if(!b||b.disabled||busy)return;
   const action=b.dataset.action;
