@@ -1,0 +1,17 @@
+node_modules/
+dist/
+work/
+outputs/
+.firebase/
+*-debug.log
+**/.gradle/
+**/build/
+**/local.properties
+**/*.p12
+**/*.jks
+**/*.keystore
+**/*password.txt
+android/tools/*.jar
+android/app/src/main/assets/
+.env*
+!.env.example
