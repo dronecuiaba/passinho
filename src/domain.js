@@ -12,7 +12,14 @@ export function monthDates(month){if(!/^\d{4}-\d{2}$/.test(month)||+month.slice(
 export const dayKey=(childId,date)=>`${childId}|${date}`;
 export const checkKey=(childId,date,taskId)=>`${childId}|${date}|${taskId}`;
 export function emptyFamily(ownerUid){return {schema:SCHEMA,ownerUid,children:{},tasks:{},guardians:{},bath:null,audit:[],createdOn:todayISO()};}
-export function allowance(child,month){const keys=Object.keys(child.allowances).filter(k=>k<=month).sort();return keys.length?child.allowances[keys.at(-1)]:0;}
+export function allowanceParts(child,month){
+  const keys=Object.keys(child.allowances).filter(k=>k<=month).sort();const raw=keys.length?child.allowances[keys.at(-1)]:0;
+  const fixedKeys=Object.keys(child.fixedAllowances||{}).filter(k=>k<=month).sort();
+  const fixed=fixedKeys.length?child.fixedAllowances[fixedKeys.at(-1)]:0;
+  return typeof raw==='number'?{fixed,objectives:raw}:{fixed:raw.fixed,objectives:raw.objectives};
+}
+export function allowance(child,month){const p=allowanceParts(child,month);return p.fixed+p.objectives;}
+export function validAllowance(value){return Number.isSafeInteger(value)&&value>=0&&value<=100000000;}
 export function version(task,date){return task.versions.filter(v=>v.from<=date).at(-1)||null;}
 export const TASK_PERIODS={morning:'Manhã',afternoon:'Tarde',evening:'Noite',overnight:'Madrugada'};
 export function normalizeSchedule(value){
@@ -42,14 +49,20 @@ export function occurrences(root,cid,date){
 export function closed(cid,date,closures,today){return date<today||Boolean(closures[dayKey(cid,date)]?.closed);}
 export function dayView(root,cid,date,checks={},closures={},today=todayISO()){
   validDate(date);const isClosed=closed(cid,date,closures,today);
-  const tasks=occurrences(root,cid,date).map(t=>{const c=checks[checkKey(cid,date,t.id)];let status=c?.status||'pending';if(isClosed&&status==='pending')status='failed';return {id:t.id,title:t.title,icon:t.icon,schedule:t.schedule||null,status,reviewed:Boolean(c?.reviewed)};});
+  const tasks=occurrences(root,cid,date).map(t=>{const c=checks[checkKey(cid,date,t.id)];const status=c?.status||'pending';return {id:t.id,title:t.title,icon:t.icon,schedule:t.schedule||null,deductsAllowance:t.deductsAllowance!==false,status,reviewed:Boolean(c?.reviewed)};});
   return {date,closed:isClosed,closureSource:closures[dayKey(cid,date)]?.closed?'guardian':isClosed?'automatic':'open',tasks,total:tasks.length,done:tasks.filter(t=>t.status==='done').length,failed:tasks.filter(t=>t.status==='failed').length};
 }
 export function summary(root,child,month,checks={},closures={},today=todayISO()){
-  let total=0,missed=0,completed=0;
-  for(const date of monthDates(month)){const d=dayView(root,child.id,date,checks,closures,today);total+=d.total;if(d.closed){missed+=d.total-d.done;completed+=d.done;}}
-  const amount=allowance(child,month),deducted=total?Math.min(amount,Math.round(amount*missed/total)):0;
-  return {...child,allowances:undefined,amount,deducted,balance:amount-deducted,occurrences:total,missed,completed};
+  let total=0,deductibleOccurrences=0,missed=0,completed=0,pending=0;
+  for(const date of monthDates(month)){
+    const d=dayView(root,child.id,date,checks,closures,today);total+=d.total;
+    deductibleOccurrences+=d.tasks.filter(t=>t.deductsAllowance).length;
+    if(date<=today){completed+=d.done;pending+=d.tasks.filter(t=>t.status==='pending').length;}
+    if(d.closed)missed+=d.tasks.filter(t=>t.deductsAllowance&&t.status==='failed').length;
+  }
+  const parts=allowanceParts(child,month),amount=parts.fixed+parts.objectives;
+  const deducted=deductibleOccurrences?Math.min(parts.objectives,Math.round(parts.objectives*missed/deductibleOccurrences)):0;
+  return {...child,allowances:undefined,fixedAllowances:undefined,amount,fixedAmount:parts.fixed,objectiveAmount:parts.objectives,objectiveBalance:parts.objectives-deducted,deducted,balance:amount-deducted,occurrences:total,deductibleOccurrences,missed,completed,pending};
 }
 export function bathChild(root,date){
   const b=root.bath;if(!b?.participants?.length||!b.startDate)return null;
@@ -74,9 +87,10 @@ export function mutateRoot(source,op,a,{today=todayISO(),uid,closures={}}={}){
   switch(op){
     case 'saveChild':{
       const cid=a.id||id();if(a.id&&!root.children[cid])throw Error('Criança não encontrada.');
-      if(!Number.isSafeInteger(a.amount)||a.amount<0||a.amount>100000000)throw Error('Informe uma mesada entre R$ 0 e R$ 1.000.000.');
+      const fixed=a.fixedAmount??0,objectives=a.objectiveAmount??a.amount;
+      if(!validAllowance(fixed)||!validAllowance(objectives))throw Error('Informe valores de mesada entre R$ 0 e R$ 1.000.000.');
       const c=root.children[cid]||{id:cid,createdOn:today,allowances:{}};
-      c.name=text(a.name);c.avatar=((Number(a.avatar)||0)%8+8)%8;c.allowances[today.slice(0,7)]=a.amount;root.children[cid]=c;selectedChildId=cid;
+      c.name=text(a.name);c.avatar=((Number(a.avatar)||0)%8+8)%8;c.allowances[today.slice(0,7)]=objectives;c.fixedAllowances??={};c.fixedAllowances[today.slice(0,7)]=fixed;root.children[cid]=c;selectedChildId=cid;
       message='Criança salva. A mesada vale para este mês e os próximos.';record(root,'Cadastro e mesada de '+c.name,uid);break;
     }
     case 'saveTask':{
@@ -86,8 +100,10 @@ export function mutateRoot(source,op,a,{today=todayISO(),uid,closures={}}={}){
       if(a.id&&!root.tasks[tid]||task.childId!==a.childId)throw Error('Tarefa não encontrada.');
       const from=closed(a.childId,today,closures,today)?addDays(today,1):today;
       const schedule=normalizeSchedule(a.schedule===undefined?version(task,from)?.schedule:a.schedule);
+      const deductsAllowance=a.deductsAllowance??(version(task,from)?.deductsAllowance!==false);
+      if(typeof deductsAllowance!=='boolean')throw Error('Opção de desconto inválida.');
       task.versions=task.versions.filter(v=>v.from<from);
-      task.versions.push({from,fromDay:dayNumber(from),title:text(a.title,100),weekdays:[...days].sort(),icon:((Number(a.icon)||0)%8+8)%8,active:a.active!==false,schedule});root.tasks[tid]=task;
+      task.versions.push({from,fromDay:dayNumber(from),title:text(a.title,100),weekdays:[...days].sort(),icon:((Number(a.icon)||0)%8+8)%8,active:a.active!==false,schedule,deductsAllowance});root.tasks[tid]=task;
       message=`Agenda salva a partir de ${from===today?'hoje':'amanhã, pois hoje já está fechado'}.`;record(root,'Alteração na agenda de '+root.children[a.childId].name,uid);break;
     }
     case 'saveBath':{

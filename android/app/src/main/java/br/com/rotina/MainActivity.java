@@ -74,6 +74,12 @@ public class MainActivity extends Activity {
         web.loadUrl("https://appassets.androidplatform.net/assets/index.html");
     }
     public final class Bridge {
+            @JavascriptInterface public void openApkDownload() {
+                runOnUiThread(()-> {
+                    Intent intent=new Intent(Intent.ACTION_VIEW,Uri.parse("https://github.com/dronecuiaba/passinho/releases/latest/download/Passinho.apk"));
+                    try { startActivity(intent); } catch(Exception e) { Toast.makeText(MainActivity.this,"Abra o site do Passinho no navegador para baixar o APK.",Toast.LENGTH_LONG).show(); }
+                });
+            }
             @JavascriptInterface public void copyText(String text) {
                 if(text==null || text.length()>10000)return;
                 runOnUiThread(()->((android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("Passinho",text)));

@@ -1,6 +1,6 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 2.1.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 3.0.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 
@@ -13,13 +13,26 @@ Versão 2.1.0. Web no GitHub Pages e APK Android usam o mesmo build de interface
 
 ## Rotina e mesada
 
-Cada repetição agendada de uma tarefa conta como uma ocorrência mensal. O desconto acumulado é `mesada × ocorrências não concluídas em dias fechados ÷ ocorrências agendadas no mês`, arredondado uma única vez para centavos. O saldo nunca fica negativo.
+Cada criança tem dois valores mensais: **mesada fixa**, protegida de descontos, e **mesada por objetivos**, sujeita aos descontos. O mês começa com os dois valores cheios.
 
-Dias abertos não descontam. A meia-noite de Brasília fecha o dia automaticamente, mantém os checks concluídos e considera tarefas sem check como não concluídas. Isso é calculado pela data, sem depender de manter o app aberto.
+- **Concluída:** mantém o valor da mesada.
+- **Não marcada:** é neutra, inclusive depois do fechamento automático. Não vira uma falha por ausência de check.
+- **Não concluída:** gera desconto somente se a tarefa tem **Desconta da mesada por objetivos** ativado e o dia está fechado. Antes de fechar, o saldo não diminui.
+- **Saldo disponível:** fixa + objetivos − descontos dos dias fechados. O desconto nunca ultrapassa a parte por objetivos.
 
-O responsável pode marcar uma tarefa como não concluída durante o dia, bloqueando a alteração pela criança. Pode validar e fechar antes da meia-noite e corrigir dias anteriores. Alterar a mesada recalcula o mês atual e vale nos próximos; meses anteriores mantêm seus valores. A agenda nova começa hoje, ou amanhã se hoje já estiver fechado, preservando o histórico anterior. Mudanças de agenda podem alterar o peso de cada ocorrência no mês atual.
+A divisão usa somente as ocorrências mensais agendadas das tarefas participantes. Tarefas sem desconto não entram na divisão, embora apareçam normalmente na rotina. Exemplo: R$ 60 fixos + R$ 90 por objetivos, com 90 ocorrências participantes: o mês começa em R$ 150. Cada ocorrência participante não concluída desconta R$ 1 ao fechar o dia. Dez falhas deixam R$ 140. O arredondamento é feito no total dos descontos.
 
-Cadastros no meio do mês usam a mesada integral, distribuída entre as ocorrências agendadas a partir da criação. Sem tarefas, não há desconto. O banho é uma fila diária com previsão de sete dias, participantes ordenados e opção de reiniciar. Seus participantes usam o mesmo cadastro das tarefas.
+A meia-noite de Brasília fecha o dia automaticamente, mesmo sem abrir o app, mantendo os status. O responsável pode fechar antes e corrigir dias anteriores. Corrigir uma falha para concluída ou não marcada devolve o desconto. A criança não edita dias fechados ou tarefas avaliadas.
+
+A opção de desconto é versionada com a tarefa: mudanças valem a partir de hoje ou amanhã se hoje já estiver fechado, preservando os dias anteriores. Adicionar, pausar ou alterar a participação de tarefas recalcula a divisão de acordo com a agenda mensal vigente. Tarefas existentes sem esse campo são consideradas participantes; o responsável pode desativar a opção.
+
+Mudar os valores de mesada recalcula o mês atual e vale nos seguintes. Meses anteriores preservam seus valores cadastrados. Os valores antigos de mesada foram mantidos como orçamento por objetivos, com fixa inicial de R$ 0 até o responsável editar. Cadastros no meio do mês usam o orçamento integral nas ocorrências a partir da criação. Sem tarefas participantes, não há descontos. O mês seguinte começa novamente com o valor cheio vigente.
+
+O banho continua sendo uma fila diária independente, com previsão de sete dias e os mesmos cadastros infantis.
+
+### Atualizar o APK pela área protegida
+
+O menu **Atualizar app**, disponível aos responsáveis autenticados, contém o link permanente `https://github.com/dronecuiaba/passinho/releases/latest/download/Passinho.apk`. A release mais recente precisa sempre conter um asset com o nome **Passinho.apk**. No Android, o botão abre o navegador para baixar o instalador; a instalação continua sendo uma ação do usuário. A versão 3.0 precisa ser instalada uma vez pelo link externo para que o menu exista no APK que antes estava offline.
 
 ### Horário opcional das tarefas
 
