@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {emptyFamily,mutateRoot,summary,dayView,checkKey,dayKey,snapshot,addDays,dayNumber,bathChild,todayISO,convertLegacy} from '../src/domain.js';
+import {emptyFamily,mutateRoot,summary,dayView,checkKey,dayKey,snapshot,addDays,dayNumber,bathChild,todayISO,convertLegacy,normalizeSchedule,scheduleLabel} from '../src/domain.js';
 const setup=(date='2026-11-01',amount=30000)=>{
   let root=emptyFamily('parent');root.guardians.parent={id:'parent',name:'Responsável',email:'test@example.invalid'};
   root=mutateRoot(root,'saveChild',{id:undefined,name:'Lia',amount,avatar:1},{today:date,uid:'parent'}).root;
@@ -20,3 +20,29 @@ test('fila do banho alterna, repete e permite reiniciar por qualquer criança',(
 test('calendário usa datas civis de São Paulo sem erro de UTC ou horário de verão',()=>{assert.equal(todayISO(new Date('2026-11-02T02:59:59Z')),'2026-11-01');assert.equal(todayISO(new Date('2026-11-02T03:00:00Z')),'2026-11-02');assert.equal(addDays('2028-02-28',1),'2028-02-29');assert.equal(addDays('2028-02-29',1),'2028-03-01');assert.equal(dayNumber('2026-11-02')-dayNumber('2026-11-01'),1);});
 test('retorno infantil não inclui funções administrativas',()=>{const f=setup();f.task('Diária');const s=snapshot(f.root,{}, {},{},{today:'2026-11-01',admin:false});assert.equal(s.authenticated,false);assert.equal('templates' in s,false);assert.equal('audit'in s,false);assert.equal(s.guardians[0].email,undefined);});
 test('backup offline é convertido sem importar hashes como credenciais da nuvem',()=>{const f=setup();const old={schema:1,children:[{id:'c',name:'Antiga',createdOn:'2026-10-01',avatar:1,allowances:{'2026-10':10000}}],tasks:[{id:'t',childId:'c',versions:[{from:'2026-10-01',title:'Diária',weekdays:[0,1,2,3,4,5,6],icon:0,active:true}]}],guardians:[{hash:'hash-antigo',salt:'salt-antigo'}],days:{'c|2026-10-01':{closed:true,checks:{t:{status:'done',reviewed:true}}}}};const r=convertLegacy(old,f.root,'2026-11-01');assert.equal(r.root.children.c.name,'Antiga');assert.equal(r.root.guardians.parent.name,'Responsável');assert.equal(JSON.stringify(r).includes('hash-antigo'),false);assert.equal(r.checks['c|2026-10-01|t'].status,'done');assert.equal(r.closures['c|2026-10-01'].closed,true);assert.throws(()=>convertLegacy({...old,schema:3},f.root));});
+test('horário é opcional e aceita hora, intervalo e período do dia',()=>{
+  assert.equal(normalizeSchedule(undefined),null);assert.equal(scheduleLabel(null),'');
+  assert.equal(scheduleLabel({type:'time',time:'08:30'}),'08:30');
+  assert.equal(scheduleLabel({type:'range',start:'14:00',end:'16:00'}),'14:00 às 16:00');
+  assert.equal(scheduleLabel({type:'period',period:'morning'}),'Manhã');
+  assert.equal(scheduleLabel({type:'period',period:'afternoon'}),'Tarde');
+  for(const value of [{type:'time',time:'24:00'},{type:'time',time:'9:60'},{type:'range',start:'16:00',end:'14:00'},{type:'range',start:'08:00',end:'08:00'},{type:'period',period:'unknown'}])assert.throws(()=>normalizeSchedule(value));
+});
+test('horário salvo aparece no dia e no cadastro e preserva o histórico',()=>{
+  const f=setup(),tid=f.task('Leitura'),save=(schedule,today)=>mutateRoot(f.root,'saveTask',{id:tid,childId:f.cid,title:'Leitura',weekdays:[0,1,2,3,4,5,6],icon:2,schedule},{today,uid:'parent'}).root;
+  f.root=save({type:'time',time:'08:00'},'2026-11-01');
+  f.root=save({type:'range',start:'14:00',end:'16:00'},'2026-11-02');
+  assert.equal(scheduleLabel(dayView(f.root,f.cid,'2026-11-01').tasks[0].schedule),'08:00');
+  assert.equal(scheduleLabel(dayView(f.root,f.cid,'2026-11-02').tasks[0].schedule),'14:00 às 16:00');
+  const s=snapshot(f.root,{}, {},{childId:f.cid,date:'2026-11-02'},{today:'2026-11-02',admin:true,uid:'parent'});
+  assert.equal(scheduleLabel(s.templates[0].schedule),'14:00 às 16:00');
+  assert.equal(s.child.occurrences,30);assert.equal(s.child.deducted,1000);
+});
+test('pausar mantém o horário; remover explicitamente mantém a tarefa sem horário',()=>{
+  const f=setup(),tid=f.task('Cama'),a={id:tid,childId:f.cid,title:'Cama',weekdays:[0,1,2,3,4,5,6],icon:0};
+  f.root=mutateRoot(f.root,'saveTask',{...a,schedule:{type:'period',period:'evening'}},{today:'2026-11-01',uid:'parent'}).root;
+  f.root=mutateRoot(f.root,'saveTask',{...a,active:false},{today:'2026-11-01',uid:'parent'}).root;
+  assert.equal(scheduleLabel(f.root.tasks[tid].versions.at(-1).schedule),'Noite');
+  f.root=mutateRoot(f.root,'saveTask',{...a,active:true,schedule:null},{today:'2026-11-01',uid:'parent'}).root;
+  assert.equal(dayView(f.root,f.cid,'2026-11-01').tasks[0].schedule,null);
+});

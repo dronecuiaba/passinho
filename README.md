@@ -1,6 +1,6 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 2.0.1. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 2.1.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 
@@ -20,6 +20,10 @@ Dias abertos não descontam. A meia-noite de Brasília fecha o dia automaticamen
 O responsável pode marcar uma tarefa como não concluída durante o dia, bloqueando a alteração pela criança. Pode validar e fechar antes da meia-noite e corrigir dias anteriores. Alterar a mesada recalcula o mês atual e vale nos próximos; meses anteriores mantêm seus valores. A agenda nova começa hoje, ou amanhã se hoje já estiver fechado, preservando o histórico anterior. Mudanças de agenda podem alterar o peso de cada ocorrência no mês atual.
 
 Cadastros no meio do mês usam a mesada integral, distribuída entre as ocorrências agendadas a partir da criação. Sem tarefas, não há desconto. O banho é uma fila diária com previsão de sete dias, participantes ordenados e opção de reiniciar. Seus participantes usam o mesmo cadastro das tarefas.
+
+### Horário opcional das tarefas
+
+No cadastro de tarefa, escolha sem horário, hora exata (08:00), intervalo (14:00 às 16:00) ou período do dia (Manhã, Tarde, Noite ou Madrugada). A informação aparece para a criança, na lista de tarefas do responsável e na avaliação diária. É possível editar ou remover o horário. O horário é uma orientação da rotina; os checks continuam disponíveis enquanto o dia estiver aberto.
 
 ## Contas e conexão
 

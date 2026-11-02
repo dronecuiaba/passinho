@@ -14,6 +14,26 @@ export const checkKey=(childId,date,taskId)=>`${childId}|${date}|${taskId}`;
 export function emptyFamily(ownerUid){return {schema:SCHEMA,ownerUid,children:{},tasks:{},guardians:{},bath:null,audit:[],createdOn:todayISO()};}
 export function allowance(child,month){const keys=Object.keys(child.allowances).filter(k=>k<=month).sort();return keys.length?child.allowances[keys.at(-1)]:0;}
 export function version(task,date){return task.versions.filter(v=>v.from<=date).at(-1)||null;}
+export const TASK_PERIODS={morning:'Manhã',afternoon:'Tarde',evening:'Noite',overnight:'Madrugada'};
+export function normalizeSchedule(value){
+  if(value==null)return null;
+  if(typeof value!=='object'||Array.isArray(value))throw Error('Horário da tarefa inválido.');
+  const time=t=>typeof t==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+  if(value.type==='time'&&time(value.time))return {type:'time',time:value.time};
+  if(value.type==='range'&&time(value.start)&&time(value.end)){
+    if(value.end<=value.start)throw Error('A hora final deve ser posterior à hora inicial.');
+    return {type:'range',start:value.start,end:value.end};
+  }
+  if(value.type==='period'&&Object.hasOwn(TASK_PERIODS,value.period))return {type:'period',period:value.period};
+  throw Error('Preencha um horário válido ou escolha um período do dia.');
+}
+export function scheduleLabel(value){
+  const s=normalizeSchedule(value);
+  if(!s)return '';
+  if(s.type==='time')return s.time;
+  if(s.type==='range')return `${s.start} às ${s.end}`;
+  return TASK_PERIODS[s.period];
+}
 export function occurrences(root,cid,date){
   const child=root.children[cid];if(!child||date<child.createdOn)return [];
   const weekday=new Date(date+'T12:00:00Z').getUTCDay();
@@ -22,7 +42,7 @@ export function occurrences(root,cid,date){
 export function closed(cid,date,closures,today){return date<today||Boolean(closures[dayKey(cid,date)]?.closed);}
 export function dayView(root,cid,date,checks={},closures={},today=todayISO()){
   validDate(date);const isClosed=closed(cid,date,closures,today);
-  const tasks=occurrences(root,cid,date).map(t=>{const c=checks[checkKey(cid,date,t.id)];let status=c?.status||'pending';if(isClosed&&status==='pending')status='failed';return {id:t.id,title:t.title,icon:t.icon,status,reviewed:Boolean(c?.reviewed)};});
+  const tasks=occurrences(root,cid,date).map(t=>{const c=checks[checkKey(cid,date,t.id)];let status=c?.status||'pending';if(isClosed&&status==='pending')status='failed';return {id:t.id,title:t.title,icon:t.icon,schedule:t.schedule||null,status,reviewed:Boolean(c?.reviewed)};});
   return {date,closed:isClosed,closureSource:closures[dayKey(cid,date)]?.closed?'guardian':isClosed?'automatic':'open',tasks,total:tasks.length,done:tasks.filter(t=>t.status==='done').length,failed:tasks.filter(t=>t.status==='failed').length};
 }
 export function summary(root,child,month,checks={},closures={},today=todayISO()){
@@ -65,8 +85,9 @@ export function mutateRoot(source,op,a,{today=todayISO(),uid,closures={}}={}){
       const tid=a.id||id(),task=root.tasks[tid]||{id:tid,childId:a.childId,versions:[]};
       if(a.id&&!root.tasks[tid]||task.childId!==a.childId)throw Error('Tarefa não encontrada.');
       const from=closed(a.childId,today,closures,today)?addDays(today,1):today;
+      const schedule=normalizeSchedule(a.schedule===undefined?version(task,from)?.schedule:a.schedule);
       task.versions=task.versions.filter(v=>v.from<from);
-      task.versions.push({from,fromDay:dayNumber(from),title:text(a.title,100),weekdays:[...days].sort(),icon:((Number(a.icon)||0)%8+8)%8,active:a.active!==false});root.tasks[tid]=task;
+      task.versions.push({from,fromDay:dayNumber(from),title:text(a.title,100),weekdays:[...days].sort(),icon:((Number(a.icon)||0)%8+8)%8,active:a.active!==false,schedule});root.tasks[tid]=task;
       message=`Agenda salva a partir de ${from===today?'hoje':'amanhã, pois hoje já está fechado'}.`;record(root,'Alteração na agenda de '+root.children[a.childId].name,uid);break;
     }
     case 'saveBath':{

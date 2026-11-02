@@ -14,3 +14,5 @@
 @media(max-width:450px){.sidebar .nav{overflow-x:auto;justify-content:flex-start;min-width:0}.sidebar .nav-item{flex-shrink:0}.sidebar .nav-item{min-height:46px}.sidebar{gap:7px}.sidebar-bottom{flex-shrink:0}.bath-participant{padding:5px}}
 
 dialog .dialog-actions{position:sticky;bottom:-27px;background:white;padding:13px 0 3px;z-index:1}@media(max-width:450px){dialog .dialog-actions{bottom:-22px}}
+
+.task-schedule{display:flex;align-items:center;gap:5px;color:var(--green);font-size:12px;font-weight:650;margin:5px 0}.task-schedule svg{width:15px;height:15px}.task-text>small{display:block}#task-schedule-inputs:empty{display:none}
