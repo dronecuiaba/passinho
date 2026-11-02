@@ -1,6 +1,6 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 3.1.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 3.1.1. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 
@@ -43,6 +43,10 @@ A opção de desconto continua disponível. Uma tarefa única participante conta
 ### Horário opcional das tarefas
 
 No cadastro de tarefa, escolha sem horário, hora exata (08:00), intervalo (14:00 às 16:00) ou período do dia (Manhã, Tarde, Noite ou Madrugada). A informação aparece para a criança, na lista de tarefas do responsável e na avaliação diária. É possível editar ou remover o horário. O horário é uma orientação da rotina; os checks continuam disponíveis enquanto o dia estiver aberto.
+
+### Confetes ao terminar o dia
+
+Quando a criança marca a última tarefa e o check é salvo com sucesso, uma chuva de confetes coloridos cai pela tela por cerca de três segundos. O efeito não intercepta toques, não reaparece ao consultar ou atualizar um dia já completo e respeita a preferência de reduzir movimentos do aparelho. Ao sair do app ou mudar a orientação, a animação é encerrada.
 
 ## Contas e conexão
 

@@ -1,5 +1,6 @@
 'use strict';
 import {Cloud} from './cloud.js';
+import {showConfetti} from './confetti.js';
 import {TASK_PERIODS,normalizeSchedule,scheduleLabel,addDays} from './domain.js';
 const cloud = new Cloud();
 const $ = s => document.querySelector(s);
@@ -118,7 +119,7 @@ function bath() {
   return html;
 }
 function updates() {
-  return header('Atualizar o aplicativo','Baixe a versão mais recente do Passinho para o tablet.')+`<section class="panel"><h2>Passinho para Android</h2><p class="muted spaced-copy">Use este link sempre que quiser atualizar o aplicativo. Ele aponta para o APK mais recente disponível.</p><div class="backup-actions"><a class="button" data-action="download-apk" href="https://github.com/dronecuiaba/passinho/releases/latest/download/Passinho.apk" target="_blank" rel="noopener noreferrer">${icon('download')}Baixar APK atualizado</a></div><p class="small muted spaced-copy">Instale sobre a versão atual. Sua família permanece conectada ao mesmo banco. Versão desta interface: 3.1.0.</p></section>`;
+  return header('Atualizar o aplicativo','Baixe a versão mais recente do Passinho para o tablet.')+`<section class="panel"><h2>Passinho para Android</h2><p class="muted spaced-copy">Use este link sempre que quiser atualizar o aplicativo. Ele aponta para o APK mais recente disponível.</p><div class="backup-actions"><a class="button" data-action="download-apk" href="https://github.com/dronecuiaba/passinho/releases/latest/download/Passinho.apk" target="_blank" rel="noopener noreferrer">${icon('download')}Baixar APK atualizado</a></div><p class="small muted spaced-copy">Instale sobre a versão atual. Sua família permanece conectada ao mesmo banco. Versão desta interface: 3.1.1.</p></section>`;
 }
 function devices() {
   return header('A mesma família, em todo lugar.','Conecte o tablet e o navegador para compartilhar tarefas, mesada e a fila do banho.')+`<section class="panel"><div class="section-head"><h2>Conectar outro aparelho</h2>${icon('devices')}</div><p class="muted">No outro aparelho, abra o Passinho e escolha “Conectar a uma família existente”. Informe o código desta família uma única vez. Depois, as crianças entram pelo nome, sem senha.</p><div class="backup-actions">${btn('Mostrar código de conexão','show-pairing','devices')}</div><p class="small muted spaced-copy">O código permite consultar a família e marcar tarefas como criança. Compartilhe somente com os aparelhos da casa. A área dos responsáveis continua exigindo senha.</p></section><div class="home-note">${icon('info')}<p>Cadastros, marcações e avaliações são sincronizados pelo Firebase. Conecte à internet para salvar alterações. O app pode consultar os dados já carregados enquanto estiver sem conexão.</p></div>`;
@@ -259,7 +260,12 @@ document.addEventListener('click',async event=>{
       case 'close-modal':$('#modal').close();break;
       case 'open-child':childId=b.dataset.id;view='daily';date=state.today;month=date.slice(0,7);await call('get');break;
       case 'select-child':childId=b.dataset.id;if(view==='daily'){date=state.today;month=date.slice(0,7);}await call('get');break;
-      case 'child-check':busy=true;await call('childCheck',{taskId:b.dataset.id,done:b.dataset.done==='true'});break;
+      case 'child-check':{
+        const completing=b.dataset.done==='true',previous=state.day,selectedChild=childId;
+        busy=true;await call('childCheck',{taskId:b.dataset.id,done:completing});
+        if(completing&&!state.authenticated&&view==='daily'&&childId===selectedChild&&date===state.today&&previous.date===date&&previous.done<previous.total&&state.day.total>0&&state.day.done===state.day.total)showConfetti();
+        break;
+      }
       case 'add-child':editChild();break;
       case 'edit-child':editChild(b.dataset.id);break;
       case 'add-task':editTask();break;
