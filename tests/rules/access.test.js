@@ -26,3 +26,14 @@ test('tarefa criada para amanhã não pode ser marcada hoje',async()=>{await env
 test('responsável pode criar família e todos os vínculos em um único lote',async()=>{const context=env.authenticatedContext('new-owner',{firebase:{sign_in_provider:'password'}}),d=context.firestore(),newFid='new-family',newCode='c'.repeat(48),batch=writeBatch(d);batch.set(doc(d,'passinhoFamilies',newFid),{...root,ownerUid:'new-owner',children:{},tasks:{},guardians:{'new-owner':{id:'new-owner',name:'Novo',email:'x@example.invalid'}}});batch.set(doc(d,'passinhoFamilies',newFid,'members','new-owner'),{uid:'new-owner',role:'admin',createdAt:serverTimestamp()});batch.set(doc(d,'passinhoFamilies',newFid,'members','new-kid'),{uid:'new-kid',role:'child',createdAt:serverTimestamp()});batch.set(doc(d,'passinhoPairings',newCode),{familyId:newFid,createdBy:'new-owner',createdAt:serverTimestamp()});batch.set(doc(d,'passinhoFamilies',newFid,'private','settings'),{pairingCode:newCode});await assertSucceeds(batch.commit());});
 test('um visitante anônimo não pode criar família com privilégios de responsável',async()=>{await assertFails(setDoc(doc(db('anonymous-attacker'),'passinhoFamilies','bad-family'),{...root,children:{},tasks:{},ownerUid:'anonymous-attacker',guardians:{'anonymous-attacker':{id:'anonymous-attacker'}}}));});
 test('dados de famílias diferentes são isolados e documento antigo mantém a regra original',async()=>{await assertFails(getDoc(doc(db(kid),'passinhoFamilies','new-family')));const d=env.unauthenticatedContext().firestore();await assertSucceeds(setDoc(doc(d,'banho','state'),{children:[],startDate:null,startChildId:null}));assert.equal((await getDoc(doc(d,'banho','state'))).exists(),true);});
+
+test('criança só marca tarefa única na data agendada, sem repetir na semana seguinte',async()=>{
+ const task={id:'once',childId:'c',versions:[{from:today,fromDay:dayNumber(today),title:'Única',repeat:'once',onDate:addDays(today,7),weekdays:[0,1,2,3,4,5,6],active:true,icon:0}]};
+ await env.withSecurityRulesDisabled(async ctx=>{await updateDoc(doc(ctx.firestore(),'passinhoFamilies',fid),{'tasks.once':task});});
+ const d=db(kid),r=doc(d,'passinhoFamilies',fid,'checks',`c|${today}|once`);
+ await assertFails(setDoc(r,check(kid,{taskId:'once'})));
+ task.versions[0].onDate=today;
+ await env.withSecurityRulesDisabled(async ctx=>{await updateDoc(doc(ctx.firestore(),'passinhoFamilies',fid),{'tasks.once':task});});
+ await assertSucceeds(setDoc(r,check(kid,{taskId:'once'})));
+ await assertSucceeds(setDoc(r,check(kid,{taskId:'once',status:'pending'})));
+});

@@ -1,6 +1,6 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 3.0.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 3.1.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 
@@ -33,6 +33,12 @@ O banho continua sendo uma fila diária independente, com previsão de sete dias
 ### Atualizar o APK pela área protegida
 
 O menu **Atualizar app**, disponível aos responsáveis autenticados, contém o link permanente `https://github.com/dronecuiaba/passinho/releases/latest/download/Passinho.apk`. A release mais recente precisa sempre conter um asset com o nome **Passinho.apk**. No Android, o botão abre o navegador para baixar o instalador; a instalação continua sendo uma ação do usuário. A versão 3.0 precisa ser instalada uma vez pelo link externo para que o menu exista no APK que antes estava offline.
+
+### Tarefa única
+
+No cadastro, escolha **Repetição → Tarefa única** e informe o **Dia da tarefa**. Os horários são os mesmos da rotina semanal: sem horário, hora exata, intervalo ou período do dia. A tarefa aparece apenas na data escolhida, sem repetição nas semanas ou meses seguintes. Pode ser agendada para hoje (se o dia estiver aberto) ou para uma data futura. Não é permitido criar uma ocorrência retroativa.
+
+A opção de desconto continua disponível. Uma tarefa única participante conta como uma ocorrência somente no mês agendado. Não marcada continua neutra, e não concluída desconta apenas depois do fechamento. Editar a data preserva os dias anteriores à edição; remarcar uma tarefa cuja data já passou cria uma nova ocorrência futura no histórico dessa tarefa. Tarefas antigas continuam semanais. Atualize todos os APKs da família para que exibam a agenda nova corretamente.
 
 ### Horário opcional das tarefas
 

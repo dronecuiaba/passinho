@@ -21,6 +21,15 @@ export function allowanceParts(child,month){
 export function allowance(child,month){const p=allowanceParts(child,month);return p.fixed+p.objectives;}
 export function validAllowance(value){return Number.isSafeInteger(value)&&value>=0&&value<=100000000;}
 export function version(task,date){return task.versions.filter(v=>v.from<=date).at(-1)||null;}
+export function normalizeRecurrence({repeat='weekly',onDate=null,weekdays}){
+  if(repeat==='once'){
+    validDate(onDate);
+    return {repeat,onDate,weekdays:[new Date(onDate+'T12:00:00Z').getUTCDay()]};
+  }
+  if(repeat!=='weekly')throw Error('Escolha rotina semanal ou tarefa única.');
+  if(!Array.isArray(weekdays)||!weekdays.length||weekdays.length>7||new Set(weekdays).size!==weekdays.length||weekdays.some(d=>!Number.isInteger(d)||d<0||d>6))throw Error('Escolha pelo menos um dia da semana.');
+  return {repeat,onDate:null,weekdays:[...weekdays].sort()};
+}
 export const TASK_PERIODS={morning:'Manhã',afternoon:'Tarde',evening:'Noite',overnight:'Madrugada'};
 export function normalizeSchedule(value){
   if(value==null)return null;
@@ -44,7 +53,7 @@ export function scheduleLabel(value){
 export function occurrences(root,cid,date){
   const child=root.children[cid];if(!child||date<child.createdOn)return [];
   const weekday=new Date(date+'T12:00:00Z').getUTCDay();
-  return Object.values(root.tasks).filter(t=>t.childId===cid).flatMap(t=>{const v=version(t,date);return v?.active&&v.weekdays.includes(weekday)?[{...v,id:t.id}]:[];});
+  return Object.values(root.tasks).filter(t=>t.childId===cid).flatMap(t=>{const v=version(t,date);return v?.active&&(v.repeat==='once'?v.onDate===date:v.weekdays.includes(weekday))?[{...v,id:t.id}]:[];});
 }
 export function closed(cid,date,closures,today){return date<today||Boolean(closures[dayKey(cid,date)]?.closed);}
 export function dayView(root,cid,date,checks={},closures={},today=todayISO()){
@@ -95,16 +104,18 @@ export function mutateRoot(source,op,a,{today=todayISO(),uid,closures={}}={}){
     }
     case 'saveTask':{
       if(!root.children[a.childId])throw Error('Criança não encontrada.');
-      const days=a.weekdays;if(!Array.isArray(days)||!days.length||days.length>7||new Set(days).size!==days.length||days.some(d=>!Number.isInteger(d)||d<0||d>6))throw Error('Escolha pelo menos um dia da semana.');
       const tid=a.id||id(),task=root.tasks[tid]||{id:tid,childId:a.childId,versions:[]};
       if(a.id&&!root.tasks[tid]||task.childId!==a.childId)throw Error('Tarefa não encontrada.');
       const from=closed(a.childId,today,closures,today)?addDays(today,1):today;
+      const previous=version(task,from);
+      const recurrence=normalizeRecurrence({repeat:a.repeat??previous?.repeat??'weekly',onDate:a.onDate===undefined?previous?.onDate:a.onDate,weekdays:a.weekdays});
+      if(a.active!==false&&recurrence.repeat==='once'&&recurrence.onDate<from)throw Error(`Escolha uma data a partir de ${from.split('-').reverse().join('/')}${from!==today?', pois hoje já está fechado':''}.`);
       const schedule=normalizeSchedule(a.schedule===undefined?version(task,from)?.schedule:a.schedule);
       const deductsAllowance=a.deductsAllowance??(version(task,from)?.deductsAllowance!==false);
       if(typeof deductsAllowance!=='boolean')throw Error('Opção de desconto inválida.');
       task.versions=task.versions.filter(v=>v.from<from);
-      task.versions.push({from,fromDay:dayNumber(from),title:text(a.title,100),weekdays:[...days].sort(),icon:((Number(a.icon)||0)%8+8)%8,active:a.active!==false,schedule,deductsAllowance});root.tasks[tid]=task;
-      message=`Agenda salva a partir de ${from===today?'hoje':'amanhã, pois hoje já está fechado'}.`;record(root,'Alteração na agenda de '+root.children[a.childId].name,uid);break;
+      task.versions.push({from,fromDay:dayNumber(from),title:text(a.title,100),...recurrence,icon:((Number(a.icon)||0)%8+8)%8,active:a.active!==false,schedule,deductsAllowance});root.tasks[tid]=task;
+      message=recurrence.repeat==='once'?`Tarefa única salva para ${recurrence.onDate.split('-').reverse().join('/')}.`:`Agenda salva a partir de ${from===today?'hoje':'amanhã, pois hoje já está fechado'}.`;record(root,'Alteração na agenda de '+root.children[a.childId].name,uid);break;
     }
     case 'saveBath':{
       const participants=a.participants;

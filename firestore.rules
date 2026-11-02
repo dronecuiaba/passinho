@@ -32,7 +32,10 @@ service cloud.firestore {
       let task = root.tasks[data.taskId];
       let version = activeVersion(task);
       return data.childId in root.children && task.childId == data.childId
-        && version.active == true && (todayLocal().dayOfWeek() % 7) in version.weekdays
+        && version.active == true
+        && (version.get('repeat', 'weekly') == 'once'
+          ? version.get('onDate', '') == data.date
+          : (version.get('repeat', 'weekly') == 'weekly' && (todayLocal().dayOfWeek() % 7) in version.weekdays))
         && version.fromDay <= int(todayLocal().toMillis() / 86400000);
     }
     function openDay(fid, data) {

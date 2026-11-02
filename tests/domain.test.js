@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {emptyFamily,mutateRoot,summary,dayView,checkKey,dayKey,snapshot,addDays,dayNumber,bathChild,todayISO,convertLegacy,normalizeSchedule,scheduleLabel} from '../src/domain.js';
+import {emptyFamily,mutateRoot,summary,dayView,checkKey,dayKey,snapshot,addDays,dayNumber,bathChild,todayISO,convertLegacy,normalizeSchedule,scheduleLabel,validateReview,normalizeRecurrence} from '../src/domain.js';
 const setup=(date='2026-11-01',amount=30000)=>{
   let root=emptyFamily('parent');root.guardians.parent={id:'parent',name:'Responsável',email:'test@example.invalid'};
   root=mutateRoot(root,'saveChild',{id:undefined,name:'Lia',amount,avatar:1},{today:date,uid:'parent'}).root;
@@ -103,4 +103,62 @@ test('mês seguinte começa cheio e alterações de ambos os valores preservam m
 test('cadastros antigos mantêm mesada em objetivos, fixa zero e tarefas participantes',()=>{
  const root=emptyFamily('p'),child={id:'c',name:'Antiga',avatar:0,createdOn:'2026-10-01',allowances:{'2026-10':3100}};root.children.c=child;root.tasks.t={id:'t',childId:'c',versions:[{from:'2026-10-01',title:'Diária',icon:0,active:true,weekdays:[0,1,2,3,4,5,6]}]};
  const s=summary(root,child,'2026-11',{}, {},'2026-11-01');assert.equal(s.fixedAmount,0);assert.equal(s.objectiveAmount,3100);assert.equal(s.balance,3100);assert.equal(s.deductibleOccurrences,30);
+});
+
+test('tarefa única aparece apenas na data agendada, inclusive em mês futuro',()=>{
+ const f=setup(),save=(onDate,schedule)=>{f.root=mutateRoot(f.root,'saveTask',{childId:f.cid,title:'Consulta',repeat:'once',onDate,schedule},{today:'2026-11-01',uid:'parent'}).root;return Object.keys(f.root.tasks).at(-1);};
+ const tid=save('2026-12-08',{type:'range',start:'14:00',end:'16:00'});
+ for(const date of ['2026-11-08','2026-12-01','2026-12-09','2026-12-15','2027-12-08'])assert.equal(dayView(f.root,f.cid,date).total,0,date);
+ const d=dayView(f.root,f.cid,'2026-12-08');assert.equal(d.total,1);assert.equal(d.tasks[0].id,tid);assert.equal(scheduleLabel(d.tasks[0].schedule),'14:00 às 16:00');
+ assert.equal(summary(f.root,f.root.children[f.cid],'2026-11').occurrences,0);assert.equal(summary(f.root,f.root.children[f.cid],'2026-12').occurrences,1);
+ const s=snapshot(f.root,{}, {},{childId:f.cid},{today:'2026-11-01',admin:true});assert.equal(s.templates[0].onDate,'2026-12-08');assert.equal(s.templates[0].repeat,'once');
+});
+
+test('tarefa única aceita todos os horários atuais e não depende de dias da semana',()=>{
+ const f=setup();for(const schedule of [null,{type:'time',time:'08:00'},{type:'range',start:'09:00',end:'10:00'},{type:'period',period:'evening'}]){
+  f.root=mutateRoot(f.root,'saveTask',{childId:f.cid,title:'Única',repeat:'once',onDate:'2026-11-02',schedule,weekdays:[]},{today:'2026-11-01',uid:'parent'}).root;
+  assert.deepEqual(Object.values(f.root.tasks).at(-1).versions[0].schedule,schedule);
+ }
+ assert.equal(dayView(f.root,f.cid,'2026-11-02').total,4);assert.equal(dayView(f.root,f.cid,'2026-11-09').total,0);
+});
+
+test('datas inválidas, retroativas e dia fechado são rejeitados sem alterar dados',()=>{
+ const f=setup(),before=JSON.stringify(f.root),a={childId:f.cid,title:'Única',repeat:'once'};
+ for(const onDate of [undefined,'','2026-02-30','2026-13-01','2026-10-31'])assert.throws(()=>mutateRoot(f.root,'saveTask',{...a,onDate},{today:'2026-11-01',uid:'parent'}));
+ assert.equal(JSON.stringify(f.root),before);
+ const closures={[dayKey(f.cid,'2026-11-01')]:{closed:true}};
+ assert.throws(()=>mutateRoot(f.root,'saveTask',{...a,onDate:'2026-11-01'},{today:'2026-11-01',uid:'parent',closures}));
+ f.root=mutateRoot(f.root,'saveTask',{...a,onDate:'2026-11-02'},{today:'2026-11-01',uid:'parent',closures}).root;
+ assert.equal(dayView(f.root,f.cid,'2026-11-01').total,0);assert.equal(dayView(f.root,f.cid,'2026-11-02').total,1);
+ assert.throws(()=>normalizeRecurrence({repeat:'monthly',weekdays:[1]}));
+});
+
+test('única participa uma vez do desconto, com não marcada neutra e revisão só na data',()=>{
+ const f=setup('2026-11-01',31000),daily=f.task('Diária');
+ f.root=mutateRoot(f.root,'saveTask',{childId:f.cid,title:'Única',repeat:'once',onDate:'2026-11-02'},{today:'2026-11-01',uid:'parent'}).root;
+ const tid=Object.keys(f.root.tasks).at(-1),checks={[checkKey(f.cid,'2026-11-02',tid)]:{status:'failed'}};
+ const s=summary(f.root,f.root.children[f.cid],'2026-11',checks,{},'2026-11-03');assert.equal(s.deductibleOccurrences,31);assert.equal(s.missed,1);assert.equal(s.deducted,1000);
+ checks[checkKey(f.cid,'2026-11-02',tid)].status='pending';assert.equal(summary(f.root,f.root.children[f.cid],'2026-11',checks,{},'2026-11-03').deducted,0);
+ assert.throws(()=>validateReview(f.root,{childId:f.cid,taskId:tid,date:'2026-11-09'},'2026-11-10'));
+ assert.doesNotThrow(()=>validateReview(f.root,{childId:f.cid,taskId:tid,date:'2026-11-02'},'2026-11-10'));
+ f.root.tasks[tid].versions[0].deductsAllowance=false;checks[checkKey(f.cid,'2026-11-02',tid)].status='failed';assert.equal(summary(f.root,f.root.children[f.cid],'2026-11',checks,{},'2026-11-03').deducted,0);
+ assert.equal(summary(f.root,f.root.children[f.cid],'2026-11',checks,{},'2026-11-03').deductibleOccurrences,30);
+});
+
+test('remarcar uma única futura remove a data anterior e pausa preserva seu tipo e horário',()=>{
+ const f=setup(),a={childId:f.cid,title:'Dentista',repeat:'once',onDate:'2026-11-05',schedule:{type:'period',period:'afternoon'}};
+ f.root=mutateRoot(f.root,'saveTask',a,{today:'2026-11-01',uid:'parent'}).root;const tid=Object.keys(f.root.tasks)[0];
+ f.root=mutateRoot(f.root,'saveTask',{...a,id:tid,onDate:'2026-11-06'},{today:'2026-11-02',uid:'parent'}).root;
+ assert.equal(dayView(f.root,f.cid,'2026-11-05').total,0);assert.equal(dayView(f.root,f.cid,'2026-11-06').total,1);
+ f.root=mutateRoot(f.root,'saveTask',{id:tid,childId:f.cid,title:'Dentista',active:false},{today:'2026-11-02',uid:'parent'}).root;
+ const v=f.root.tasks[tid].versions.at(-1);assert.equal(v.repeat,'once');assert.equal(v.onDate,'2026-11-06');assert.equal(scheduleLabel(v.schedule),'Tarde');assert.equal(dayView(f.root,f.cid,'2026-11-06').total,0);
+});
+
+test('editar uma única após sua data preserva ocorrência e check anteriores',()=>{
+ const f=setup(),a={childId:f.cid,title:'Apresentação',repeat:'once',onDate:'2026-11-02'};
+ f.root=mutateRoot(f.root,'saveTask',a,{today:'2026-11-01',uid:'parent'}).root;const tid=Object.keys(f.root.tasks)[0];
+ f.root=mutateRoot(f.root,'saveTask',{...a,id:tid,title:'Nova apresentação',onDate:'2026-11-10'},{today:'2026-11-03',uid:'parent'}).root;
+ const checks={[checkKey(f.cid,'2026-11-02',tid)]:{status:'done'}};
+ assert.equal(dayView(f.root,f.cid,'2026-11-02',checks).tasks[0].title,'Apresentação');assert.equal(dayView(f.root,f.cid,'2026-11-02',checks).done,1);
+ assert.equal(dayView(f.root,f.cid,'2026-11-10').tasks[0].title,'Nova apresentação');assert.equal(summary(f.root,f.root.children[f.cid],'2026-11',checks).occurrences,2);
 });
