@@ -1,12 +1,12 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 3.1.1. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 3.1.2. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 
 1. Abra o site ou instale o APK atualizado e escolha **Criar minha família**.
 2. Crie o primeiro responsável com nome e senha. Não há senha padrão.
-3. Em **Banho da vez**, use **Importar do Banho da Vez** para aproveitar as crianças, a ordem e a data inicial do app anterior. Crianças importadas começam com mesada de R$ 0; defina o valor em **Crianças**.
+3. Cadastre as crianças em **Crianças**, com os valores de mesada. Em **Banho da vez**, configure a fila com pelo menos duas crianças.
 4. Cadastre as tarefas de cada criança e os dias da semana.
 5. Em **Aparelhos**, mostre o código da família. Nos demais aparelhos, escolha **Conectar a uma família existente** e informe esse código uma única vez. Não crie outra família no segundo aparelho.
 6. Bloqueie a área dos responsáveis. As crianças entram escolhendo o nome, sem senha.
@@ -58,9 +58,11 @@ A autorização é verificada no Firestore, além da interface. A criança não 
 
 As alterações precisam de internet para confirmação. O cache permite consultar dados já carregados enquanto estiver offline. O projeto Firebase é `banho-da-vez`, no plano Spark, sujeito às cotas do serviço. Nenhum upgrade ou serviço pago foi contratado. A configuração web do Firebase é pública; o controle de acesso está na autenticação e nas regras.
 
-### App anterior e Alexa
+### Segurança e descontinuação do app antigo
 
-O documento legado `banho/state` permanece intacto, com as mesmas permissões anteriores, para preservar o site e a skill Alexa existentes. A importação cria uma cópia da configuração dentro da família do Passinho e reutiliza as crianças pelo nome. Alterações posteriores na nova fila são sincronizadas entre web e Android do Passinho. O app antigo e a Alexa continuam consultando o documento legado; conectar a Alexa à fila privada nova exige atualizar a skill e seu acesso ao Firebase.
+O repositório e o GitHub Pages continuam públicos. A configuração web do Firebase identifica o projeto; ela não substitui autenticação e regras de acesso. Credenciais administrativas, chaves privadas e a assinatura do APK ficam fora do repositório e das releases.
+
+O acesso de clientes a toda a árvore legada `banho/**` foi desativado. A antiga integração pública do Banho da Vez/Alexa foi descontinuada e a importação dessa fila foi removida. A fila atual fica dentro de cada família privada do Passinho e continua compartilhada entre os aparelhos vinculados. O projeto Firebase `banho-da-vez` é mantido, pois armazena os dados atuais do Passinho. Caminhos não declarados nas regras são negados por padrão. A chave cliente foi limitada a Cloud Firestore API, Identity Toolkit API e Token Service API. Ela é compartilhada entre a web e o WebView Android; adicionar novos serviços exige revisar essa lista.
 
 ## Backup e migração do APK 1.0
 

@@ -6,7 +6,7 @@ import {emptyFamily,snapshot,mutateRoot,id,todayISO,checkKey,dayKey,closed,occur
 
 const FAMILY_KEY='passinho-family-v2';
 const PAIR_HASH='vincular=';
-const adminOps=new Set(['saveChild','saveTask','saveBath','review','closeDay','saveGuardian','deleteGuardian','backup','restore','pairing','importBath']);
+const adminOps=new Set(['saveChild','saveTask','saveBath','review','closeDay','saveGuardian','deleteGuardian','backup','restore','pairing']);
 const cleanError=error=>{
   const code=error.code||'';
   if(/invalid-credential|wrong-password|user-not-found|invalid-login-credentials/.test(code))return 'Nome ou senha incorretos.';
@@ -158,16 +158,6 @@ export class Cloud {
     for(const[key,value]of Object.entries(closures))batch.set(this.ref('closures',key,db),{childId:value.childId,date:value.date,closed:Boolean(value.closed),by:uid,updatedAt:serverTimestamp()});
     await batch.commit();this.root=root;this.month='';await this.loadMonth(todayISO().slice(0,7));
   }
-  async importBath(){
-    this.ensureAdmin();this.ensureOnline();const old=await getDoc(doc(this.db,'banho','state'));if(!old.exists())throw Error('Não há fila configurada no app anterior.');const bath=old.data();
-    if(!Array.isArray(bath.children)||bath.children.length<2)throw Error('A fila anterior não tem pelo menos duas crianças.');
-    let imported;
-    await runTransaction(this.adminDb,async tx=>{
-      const ref=this.familyRef(this.adminDb),s=await tx.get(ref),root=s.data(),today=todayISO(),participants=[],ids={};
-      for(const oldChild of bath.children){let c=Object.values(root.children).find(c=>c.name.trim().toLocaleLowerCase('pt-BR')===oldChild.name.trim().toLocaleLowerCase('pt-BR'));if(!c){const cid=id();c={id:cid,name:oldChild.name.trim(),createdOn:today,avatar:Object.keys(root.children).length%8,allowances:{[today.slice(0,7)]:0}};root.children[cid]=c;}participants.push(c.id);ids[oldChild.id]=c.id;}
-      root.bath={participants,startDate:bath.startDate||today,startChildId:ids[bath.startChildId]||participants[0]};record(root,'Importação da fila do Banho da Vez',this.adminAuth.currentUser.uid);tx.set(ref,root);imported=root;
-    });this.root=imported;
-  }
   async request(a){
     try{
       await this.ready;if(a.activity&&this.isAdmin())this.lastActivity=Date.now();
@@ -188,7 +178,6 @@ export class Cloud {
         else if(op==='backup'){extra.backup=await this.exportBackup();}
         else if(op==='restore'){await this.restore(a.backup);message='Backup restaurado. Os acessos atuais foram preservados.';}
         else if(op==='pairing'){const s=await getDoc(this.ref('private','settings',this.adminDb));extra.pairingCode=s.data().pairingCode;}
-        else if(op==='importBath'){await this.importBath();message='Fila do banho importada. Defina a mesada e as tarefas de cada criança.';}
         else throw Error('Ação desconhecida.');
       }
       if(this.root)await this.loadMonth(a.month||(a.date||todayISO()).slice(0,7));

@@ -1,6 +1,17 @@
 rules_version = '2';
+// Passinho schema 2: family documents contain the children/tasks/guardians maps,
+// bath configuration and audit list. Only that family's member UIDs can read it.
+// members/{uid}: immutable UID + admin/child role; only an existing admin or a
+// password-authenticated new-family owner can grant administrative membership.
+// checks/{childId|date|taskId}: status, reviewed, by and server updatedAt.
+// closures/{childId|date}: closed, by and server updatedAt.
+// private/settings and pairing management are restricted to family admins.
+// The old standalone /banho tree is retired and inaccessible to all clients.
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Explicit default deny. Specific Passinho rules below are the only grants.
+    match /{document=**} { allow read, write: if false; }
+
     function signedIn() { return request.auth != null; }
     function familyPath(fid) { return /databases/$(database)/documents/passinhoFamilies/$(fid); }
     function memberPath(fid, uid) { return /databases/$(database)/documents/passinhoFamilies/$(fid)/members/$(uid); }
@@ -57,9 +68,9 @@ service cloud.firestore {
         && dateIsToday(d.date) && openDay(fid, d) && scheduled(fid, d);
     }
 
-    // The previous app and Alexa already use this public document.
-    // Preserve its exact existing access; all new Passinho data is isolated below.
-    match /banho/state { allow read, write: if true; }
+    // Retired standalone app: neither anonymous users nor family admins may
+    // access the legacy document, sibling documents, or nested subcollections.
+    match /banho/{document=**} { allow read, write: if false; }
 
     match /passinhoPairings/{code} {
       allow get: if signedIn();

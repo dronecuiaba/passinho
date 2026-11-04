@@ -2,7 +2,7 @@ import {before,after,test} from 'node:test';
 import {readFile} from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import {initializeTestEnvironment,assertSucceeds,assertFails} from '@firebase/rules-unit-testing';
-import {doc,setDoc,getDoc,updateDoc,serverTimestamp,deleteDoc,writeBatch,runTransaction} from 'firebase/firestore';
+import {doc,setDoc,getDoc,getDocs,collection,query,where,updateDoc,serverTimestamp,deleteDoc,writeBatch,runTransaction} from 'firebase/firestore';
 import {todayISO,dayNumber,addDays} from '../../src/domain.js';
 let env;
 const fid='test-family',parent='parent',kid='child',stranger='stranger',code='a'.repeat(48),today=todayISO();
@@ -25,7 +25,61 @@ test('fechamento bloqueia checks e somente responsável pode corrigir passado',a
 test('tarefa criada para amanhã não pode ser marcada hoje',async()=>{await env.withSecurityRulesDisabled(async ctx=>{const d=ctx.firestore();await deleteDoc(doc(d,'passinhoFamilies',fid,'closures',`c|${today}`));await updateDoc(doc(d,'passinhoFamilies',fid),{'tasks.future':{id:'future',childId:'c',versions:[{from:addDays(today,1),fromDay:dayNumber(today)+1,title:'Amanhã',weekdays:[0,1,2,3,4,5,6],active:true,icon:0}]}});});await assertFails(setDoc(doc(db(kid),'passinhoFamilies',fid,'checks',`c|${today}|future`),check(kid,{taskId:'future'})));});
 test('responsável pode criar família e todos os vínculos em um único lote',async()=>{const context=env.authenticatedContext('new-owner',{firebase:{sign_in_provider:'password'}}),d=context.firestore(),newFid='new-family',newCode='c'.repeat(48),batch=writeBatch(d);batch.set(doc(d,'passinhoFamilies',newFid),{...root,ownerUid:'new-owner',children:{},tasks:{},guardians:{'new-owner':{id:'new-owner',name:'Novo',email:'x@example.invalid'}}});batch.set(doc(d,'passinhoFamilies',newFid,'members','new-owner'),{uid:'new-owner',role:'admin',createdAt:serverTimestamp()});batch.set(doc(d,'passinhoFamilies',newFid,'members','new-kid'),{uid:'new-kid',role:'child',createdAt:serverTimestamp()});batch.set(doc(d,'passinhoPairings',newCode),{familyId:newFid,createdBy:'new-owner',createdAt:serverTimestamp()});batch.set(doc(d,'passinhoFamilies',newFid,'private','settings'),{pairingCode:newCode});await assertSucceeds(batch.commit());});
 test('um visitante anônimo não pode criar família com privilégios de responsável',async()=>{await assertFails(setDoc(doc(db('anonymous-attacker'),'passinhoFamilies','bad-family'),{...root,children:{},tasks:{},ownerUid:'anonymous-attacker',guardians:{'anonymous-attacker':{id:'anonymous-attacker'}}}));});
-test('dados de famílias diferentes são isolados e documento antigo mantém a regra original',async()=>{await assertFails(getDoc(doc(db(kid),'passinhoFamilies','new-family')));const d=env.unauthenticatedContext().firestore();await assertSucceeds(setDoc(doc(d,'banho','state'),{children:[],startDate:null,startChildId:null}));assert.equal((await getDoc(doc(d,'banho','state'))).exists(),true);});
+test('dados e permissões de famílias diferentes permanecem isolados',async()=>{
+ for(const uid of [kid,parent]){
+  const d=db(uid),family=doc(d,'passinhoFamilies','new-family');
+  await assertFails(getDoc(family));
+  await assertFails(updateDoc(family,{audit:[]}));
+  await assertFails(setDoc(doc(d,'passinhoFamilies','new-family','members',uid),{uid,role:'admin',createdAt:serverTimestamp()}));
+  await assertFails(setDoc(doc(d,'passinhoFamilies','new-family','checks',`c|${today}|t`),check(uid)));
+  await assertFails(getDoc(doc(d,'passinhoFamilies','new-family','private','settings')));
+ }
+});
+
+test('árvore antiga do banho nega leitura, listagem e qualquer gravação para todos os clientes',async()=>{
+ const paths=[['banho','state'],['banho','other'],['banho','state','history','past']];
+ await env.withSecurityRulesDisabled(async ctx=>{for(const path of paths)await setDoc(doc(ctx.firestore(),...path),{retired:true});});
+ const clients=[env.unauthenticatedContext().firestore(),db(stranger),db(kid),db(parent)];
+ for(const d of clients){
+  await assertFails(getDocs(collection(d,'banho')));
+  await assertFails(getDocs(collection(d,'banho','state','history')));
+  for(const path of paths){
+   const ref=doc(d,...path);
+   await assertFails(getDoc(ref));
+   await assertFails(setDoc(ref,{retired:false}));
+   await assertFails(updateDoc(ref,{retired:false}));
+   await assertFails(deleteDoc(ref));
+  }
+  await assertFails(setDoc(doc(d,'banho','new-document'),{retired:false}));
+ }
+});
+
+test('caminhos desconhecidos e enumeração de famílias ou códigos são negados',async()=>{
+ await env.withSecurityRulesDisabled(async ctx=>{await setDoc(doc(ctx.firestore(),'unknown','private'),{private:true});});
+ for(const d of [env.unauthenticatedContext().firestore(),db(stranger),db(kid),db(parent)]){
+  await assertFails(getDoc(doc(d,'unknown','private')));
+  await assertFails(setDoc(doc(d,'unknown','new-document'),{private:false}));
+  await assertFails(getDocs(collection(d,'passinhoFamilies')));
+  await assertFails(getDocs(collection(d,'passinhoPairings')));
+ }
+});
+
+test('criança não promove o próprio vínculo nem altera a fonte de autoridade dos responsáveis',async()=>{
+ const d=db(kid),member=doc(d,'passinhoFamilies',fid,'members',kid);
+ await assertFails(updateDoc(member,{role:'admin'}));
+ await assertFails(setDoc(member,{uid:kid,role:'admin',createdAt:serverTimestamp()}));
+ await assertFails(updateDoc(doc(d,'passinhoFamilies',fid),{[`guardians.${kid}`]:{id:kid,name:'Falso responsável',email:'fake@example.invalid'}}));
+ await assertFails(deleteDoc(member));
+});
+
+test('consultas mensais da família e fila do banho privada continuam funcionando',async()=>{
+ const d=db(parent),bath={participants:['c','other-child'],startDate:today,startChildId:'c'};
+ await assertSucceeds(updateDoc(doc(d,'passinhoFamilies',fid),{'children.other-child':{id:'other-child',name:'Outra criança',avatar:1,createdOn:today,allowances:{[today.slice(0,7)]:0}},bath}));
+ assert.deepEqual((await assertSucceeds(getDoc(doc(db(kid),'passinhoFamilies',fid)))).data().bath,bath);
+ for(const client of [db(kid),d])for(const kind of ['checks','closures']){
+  await assertSucceeds(getDocs(query(collection(client,'passinhoFamilies',fid,kind),where('date','>=',today.slice(0,7)+'-01'),where('date','<=',today))));
+ }
+});
 
 test('criança só marca tarefa única na data agendada, sem repetir na semana seguinte',async()=>{
  const task={id:'once',childId:'c',versions:[{from:today,fromDay:dayNumber(today),title:'Única',repeat:'once',onDate:addDays(today,7),weekdays:[0,1,2,3,4,5,6],active:true,icon:0}]};
