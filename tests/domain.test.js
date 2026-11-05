@@ -162,3 +162,10 @@ test('editar uma única após sua data preserva ocorrência e check anteriores',
  assert.equal(dayView(f.root,f.cid,'2026-11-02',checks).tasks[0].title,'Apresentação');assert.equal(dayView(f.root,f.cid,'2026-11-02',checks).done,1);
  assert.equal(dayView(f.root,f.cid,'2026-11-10').tasks[0].title,'Nova apresentação');assert.equal(summary(f.root,f.root.children[f.cid],'2026-11',checks).occurrences,2);
 });
+
+test('criança consulta calendário de meses anteriores sem receber funções administrativas',()=>{
+ const f=setup(),tid=f.task('Diária'),checks={[checkKey(f.cid,'2026-11-02',tid)]:{status:'done'}};
+ const s=snapshot(f.root,checks,{}, {childId:f.cid,date:'2026-11-02',month:'2026-11'},{today:'2026-12-05',admin:false});
+ assert.equal(s.calendar.length,30);assert.equal(s.day.date,'2026-11-02');assert.equal(s.day.closed,true);assert.equal(s.day.tasks[0].status,'done');assert.equal(s.calendar[1].done,1);
+ assert.equal('templates'in s,false);assert.equal('audit'in s,false);assert.equal(s.authenticated,false);
+});

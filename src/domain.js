@@ -86,7 +86,8 @@ export function snapshot(root,checks,closures,args={},context={}){
   const guardians=Object.values(root.guardians).map(g=>({id:g.id,name:g.name}));
   const result={today,date,month,children,guardians,authenticated:Boolean(context.admin),actor:context.admin?context.uid:'',setup:false,paired:true,familyId:context.familyId,online:context.online!==false,bath:root.bath,bathToday:bathChild(root,today),bathUpcoming:Array.from({length:7},(_,i)=>({date:addDays(today,i),child:bathChild(root,addDays(today,i))}))};
   if(child){result.child=child;result.day=dayView(root,child.id,date,checks,closures,today);}
-  if(context.admin){result.calendar=child?monthDates(month).map(d=>dayView(root,child.id,d,checks,closures,today)):[];result.templates=child?Object.values(root.tasks).filter(t=>t.childId===child.id).map(t=>({...version(t,addDays(today,1)),id:t.id})).filter(t=>t.from):[];result.audit=root.audit||[];}
+  result.calendar=child?monthDates(month).map(d=>dayView(root,child.id,d,checks,closures,today)):[];
+  if(context.admin){result.templates=child?Object.values(root.tasks).filter(t=>t.childId===child.id).map(t=>({...version(t,addDays(today,1)),id:t.id})).filter(t=>t.from):[];result.audit=root.audit||[];}
   return result;
 }
 export function record(root,message,uid,at=new Date().toISOString()){root.audit=[...(root.audit||[]),{message,actor:uid,at}].slice(-500);}
