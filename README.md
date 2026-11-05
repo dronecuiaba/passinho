@@ -1,6 +1,6 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 3.2.0. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 3.2.1. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 
@@ -50,7 +50,7 @@ Quando a criança marca a última tarefa e o check é salvo com sucesso, uma chu
 
 ### Histórico infantil
 
-Em **Minhas tarefas**, cada criança pode escolher um mês e um dia no calendário para consultar suas tarefas e status anteriores. Datas futuras e anteriores ao cadastro ficam desabilitadas. O histórico é somente para leitura; os checks só podem ser alterados no dia atual enquanto estiver aberto, respeitando a avaliação do responsável. O botão **Voltar para hoje** retorna à rotina atual.
+Em **Minhas tarefas**, cada criança pode escolher um mês e um dia no calendário para consultar suas tarefas e status anteriores. Datas futuras e anteriores ao cadastro ficam desabilitadas. Dias com pelo menos uma tarefa marcada como **Não concluída** têm fundo vermelho claro, mesmo que outras tarefas estejam concluídas. Tarefas **Não marcadas** continuam neutras. A indicação aparece nos calendários infantil e do responsável. O histórico é somente para leitura; os checks só podem ser alterados no dia atual enquanto estiver aberto, respeitando a avaliação do responsável. O botão **Voltar para hoje** retorna à rotina atual.
 
 ## Contas e conexão
 
