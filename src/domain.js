@@ -50,6 +50,21 @@ export function scheduleLabel(value){
   if(s.type==='range')return `${s.start} às ${s.end}`;
   return TASK_PERIODS[s.period];
 }
+const periodOrder={overnight:0,morning:1,afternoon:2,evening:3};
+const taskTitleOrder=new Intl.Collator('pt-BR');
+function compareTaskSchedule(a,b){
+  const startA=a.schedule?.start??a.schedule?.time;
+  const startB=b.schedule?.start??b.schedule?.time;
+  if(startA!==startB){
+    if(!startA)return 1;
+    if(!startB)return -1;
+    return startA.localeCompare(startB);
+  }
+  const periodA=periodOrder[a.schedule?.period]??Infinity;
+  const periodB=periodOrder[b.schedule?.period]??Infinity;
+  if(periodA!==periodB)return periodA<periodB?-1:1;
+  return taskTitleOrder.compare(a.title,b.title)||a.id.localeCompare(b.id);
+}
 export function occurrences(root,cid,date){
   const child=root.children[cid];if(!child||date<child.createdOn)return [];
   const weekday=new Date(date+'T12:00:00Z').getUTCDay();
@@ -58,7 +73,7 @@ export function occurrences(root,cid,date){
 export function closed(cid,date,closures,today){return date<today||Boolean(closures[dayKey(cid,date)]?.closed);}
 export function dayView(root,cid,date,checks={},closures={},today=todayISO()){
   validDate(date);const isClosed=closed(cid,date,closures,today);
-  const tasks=occurrences(root,cid,date).map(t=>{const c=checks[checkKey(cid,date,t.id)];const status=c?.status||'pending';return {id:t.id,title:t.title,icon:t.icon,schedule:t.schedule||null,deductsAllowance:t.deductsAllowance!==false,status,reviewed:Boolean(c?.reviewed)};});
+  const tasks=occurrences(root,cid,date).sort(compareTaskSchedule).map(t=>{const c=checks[checkKey(cid,date,t.id)];const status=c?.status||'pending';return {id:t.id,title:t.title,icon:t.icon,schedule:t.schedule||null,deductsAllowance:t.deductsAllowance!==false,status,reviewed:Boolean(c?.reviewed)};});
   return {date,closed:isClosed,closureSource:closures[dayKey(cid,date)]?.closed?'guardian':isClosed?'automatic':'open',tasks,total:tasks.length,done:tasks.filter(t=>t.status==='done').length,failed:tasks.filter(t=>t.status==='failed').length};
 }
 export function summary(root,child,month,checks={},closures={},today=todayISO()){
@@ -87,7 +102,7 @@ export function snapshot(root,checks,closures,args={},context={}){
   const result={today,date,month,children,guardians,authenticated:Boolean(context.admin),actor:context.admin?context.uid:'',setup:false,paired:true,familyId:context.familyId,online:context.online!==false,bath:root.bath,bathToday:bathChild(root,today),bathUpcoming:Array.from({length:7},(_,i)=>({date:addDays(today,i),child:bathChild(root,addDays(today,i))}))};
   if(child){result.child=child;result.day=dayView(root,child.id,date,checks,closures,today);}
   result.calendar=child?monthDates(month).map(d=>dayView(root,child.id,d,checks,closures,today)):[];
-  if(context.admin){result.templates=child?Object.values(root.tasks).filter(t=>t.childId===child.id).map(t=>({...version(t,addDays(today,1)),id:t.id})).filter(t=>t.from):[];result.audit=root.audit||[];}
+  if(context.admin){result.templates=child?Object.values(root.tasks).filter(t=>t.childId===child.id).map(t=>({...version(t,addDays(today,1)),id:t.id})).filter(t=>t.from).sort(compareTaskSchedule):[];result.audit=root.audit||[];}
   return result;
 }
 export function record(root,message,uid,at=new Date().toISOString()){root.audit=[...(root.audit||[]),{message,actor:uid,at}].slice(-500);}

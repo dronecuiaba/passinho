@@ -1,6 +1,6 @@
 # Passinho — tarefas, mesada e banho
 
-Versão 3.2.1. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
+Versão 3.2.2. Web no GitHub Pages e APK Android usam o mesmo build de interface e o mesmo Firebase Firestore. Os dados do Passinho são privados por família e compartilhados em tempo real entre aparelhos vinculados.
 
 ## Primeiro acesso
 

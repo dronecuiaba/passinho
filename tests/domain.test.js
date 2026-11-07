@@ -34,6 +34,38 @@ test('horário é opcional e aceita hora, intervalo e período do dia',()=>{
   assert.equal(scheduleLabel({type:'period',period:'afternoon'}),'Tarde');
   for(const value of [{type:'time',time:'24:00'},{type:'time',time:'9:60'},{type:'range',start:'16:00',end:'14:00'},{type:'range',start:'08:00',end:'08:00'},{type:'period',period:'unknown'}])assert.throws(()=>normalizeSchedule(value));
 });
+test('a ordem por horário e período é igual para criança e responsável após mudar um status',()=>{
+  const f=setup(),today='2026-11-01';
+  const agenda=[
+    ['Sem horário',null],
+    ['Noite',{type:'period',period:'evening'}],
+    ['Tarde',{type:'period',period:'afternoon'}],
+    ['Manhã',{type:'period',period:'morning'}],
+    ['Madrugada',{type:'period',period:'overnight'}],
+    ['Almoço',{type:'time',time:'12:00'}],
+    ['Leitura',{type:'time',time:'08:00'}],
+    ['Estudo',{type:'range',start:'08:00',end:'09:00'}],
+  ];
+  for(const [title,schedule] of agenda){
+    f.root=mutateRoot(f.root,'saveTask',{childId:f.cid,title,schedule,weekdays:[0],icon:0},{today,uid:'parent'}).root;
+  }
+  const args={childId:f.cid,date:today};
+  const expected=['Estudo','Leitura','Almoço','Madrugada','Manhã','Tarde','Noite','Sem horário'];
+  const titles=tasks=>tasks.map(t=>t.title);
+  const before=snapshot(f.root,{}, {},args,{today,admin:true});
+  assert.deepEqual(titles(before.day.tasks),expected);
+  assert.deepEqual(titles(before.templates),expected);
+
+  const [first,...rest]=Object.entries(f.root.tasks);
+  f.root.tasks=Object.fromEntries([...rest,first]);
+  const lunch=before.day.tasks.find(t=>t.title==='Almoço');
+  const checks={[checkKey(f.cid,today,lunch.id)]:{status:'failed',reviewed:true}};
+  for(const admin of [true,false]){
+    const after=snapshot(f.root,checks,{},args,{today,admin});
+    assert.deepEqual(titles(after.day.tasks),expected);
+    assert.equal(after.day.tasks[2].status,'failed');
+  }
+});
 test('horário salvo aparece no dia e no cadastro e preserva o histórico',()=>{
   const f=setup(),tid=f.task('Leitura'),save=(schedule,today)=>mutateRoot(f.root,'saveTask',{id:tid,childId:f.cid,title:'Leitura',weekdays:[0,1,2,3,4,5,6],icon:2,schedule},{today,uid:'parent'}).root;
   f.root=save({type:'time',time:'08:00'},'2026-11-01');
